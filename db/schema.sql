@@ -1,0 +1,4 @@
+-- Slotly database schema
+-- Tables: profiles, slots, appointments
+-- Includes Row Level Security policies and triggers
+-- TO BE FILLED IN — paste the schema provided in the next chat message.
