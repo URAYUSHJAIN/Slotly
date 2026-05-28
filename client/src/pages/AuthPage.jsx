@@ -86,9 +86,9 @@ export default function AuthPage() {
 
         // Verify the role matches what they selected
         const profile = await fetchMyProfile();
-        if (profile && profile.role !== role) {
+        if (!profile || profile.role !== role) {
           await authClient.signOut();
-          throw new Error(`This account is registered as a ${profile.role === 'patient' ? 'Patient' : 'Doctor'}. Please use the correct login tab.`);
+          throw new Error(`This account is not a registered ${role === 'doctor' ? 'Doctor' : 'Patient'}. Please use the correct login tab or sign up.`);
         }
 
         await refresh();
@@ -170,7 +170,7 @@ export default function AuthPage() {
               </>
             ) : (
               <>
-                <div className="auth-grid" style={{ gridTemplateColumns: role === 'doctor' ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)' }}>
+                <div className="auth-grid">
                   <label className="auth-field">
                     First Name (required)
                     <input

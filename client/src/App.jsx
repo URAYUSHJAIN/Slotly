@@ -60,7 +60,11 @@ function SectionHeader({ badge, badgeVariant = 'primary', title, subtitle }) {
 }
 
 /* ── Page ───────────────────────────────────────────── */
+import { useNavigate, Link } from 'react-router-dom';
+
 export default function App() {
+  const navigate = useNavigate();
+
   return (
     <div style={{ minHeight: '100vh' }}>
 
@@ -74,7 +78,7 @@ export default function App() {
       <Hero />
 
       {/* ── Services ────────────────────────────────── */}
-      <section className="section" id="features" style={{ padding: 44 }}>
+      <section className="section" id="features">
 
         <SectionHeader
           badge="Specialties"
@@ -86,7 +90,11 @@ export default function App() {
         <div className="grid-full">
           <div className="grid-services">
             {SERVICES.map((s, i) => (
-              <div key={s.title} className={`animate-fade-in-up animation-delay-${(i + 1) * 100}`}>
+              <div 
+                key={s.title} 
+                className={`animate-fade-in-up animation-delay-${(i + 1) * 100}`}
+                style={{ position: 'sticky', top: `${80 + i * 20}px` }}
+              >
                 <ServiceCard {...s} />
               </div>
             ))}
@@ -187,7 +195,10 @@ export default function App() {
             Search by symptom, specialty, or doctor name.
           </p>
           <div style={{ maxWidth: 560, margin: '0 auto' }}>
-            <SearchBar onSearch={(query) => navigate(`/doctors?q=${encodeURIComponent(query || '')}`)} />
+            <SearchBar 
+              suggestions={SERVICES.map(s => s.title)}
+              onSearch={(query) => navigate(`/doctors?q=${encodeURIComponent(query || '')}`)} 
+            />
           </div>
         </div>
       </section>
@@ -218,13 +229,6 @@ export default function App() {
             >
               Create free account
             </button>
-            <button 
-              className="btn" 
-              style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.22)' }}
-              onClick={() => navigate('/doctors')}
-            >
-              Book as guest
-            </button>
           </div>
         </div>
       </section>
@@ -241,7 +245,14 @@ export default function App() {
           <p className="text-caption" style={{ color: '#8f97ad' }}>© 2026 Slotly. All rights reserved.</p>
           <div style={{ display: 'flex', gap: 18 }}>
             {['Privacy', 'Terms', 'Support'].map(l => (
-              <a key={l} href="#" className="text-caption" style={{ color: '#6d7489', textDecoration: 'none' }}>{l}</a>
+              <Link 
+                key={l} 
+                to={`/${l.toLowerCase()}`} 
+                className="text-caption" 
+                style={{ color: '#6d7489', textDecoration: 'none' }}
+              >
+                {l}
+              </Link>
             ))}
           </div>
         </div>

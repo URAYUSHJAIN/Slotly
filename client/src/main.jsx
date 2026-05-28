@@ -11,6 +11,9 @@ import AboutPage from './pages/AboutPage.jsx'
 import AppointmentsPage from './pages/AppointmentsPage.jsx'
 import PatientsPage from './pages/PatientsPage.jsx'
 import BrowseDoctorsPage from './pages/BrowseDoctorsPage.jsx'
+import PrivacyPage from './pages/PrivacyPage.jsx'
+import TermsPage from './pages/TermsPage.jsx'
+import SupportPage from './pages/SupportPage.jsx'
 import { AuthProvider } from './lib/useAuth.jsx'
 
 function ScrollToTop() {
@@ -38,6 +41,9 @@ createRoot(document.getElementById('root')).render(
           <Route path="/appointments" element={<AppointmentsPage />} />
           <Route path="/patients" element={<PatientsPage />} />
           <Route path="/doctors" element={<BrowseDoctorsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/support" element={<SupportPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

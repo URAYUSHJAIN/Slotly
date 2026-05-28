@@ -54,7 +54,7 @@ function DoctorView() {
           </button>
         </div>
       </div>
-      
+
       {view === 'dashboard' ? <DoctorDashboard /> : <DoctorSchedule />}
     </>
   );
@@ -62,7 +62,7 @@ function DoctorView() {
 
 export default function AppointmentsPage() {
   const { status, role, profile } = useAuth();
-  
+
   console.log('AppointmentsPage render:', { status, role, profile });
 
   if (status === 'loading') {
