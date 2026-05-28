@@ -915,6 +915,7 @@ svg {
   border: none;
   font-family: inherit;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: color var(--duration-fast) var(--ease-standard);
 }
 
