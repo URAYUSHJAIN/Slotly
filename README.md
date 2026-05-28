@@ -1,31 +1,30 @@
-# Slotly — Seamless Healthcare Scheduling
+<div align="center">
+  <img src="client/src/assets/logo.webp" alt="Slotly Logo" width="120" />
+  <h1>Slotly</h1>
+  <p>A modern, sleek, and high-performance appointment booking platform for doctors and patients.</p>
+</div>
 
-A full-stack web platform for booking healthcare appointments. Patients 
-browse doctors and book slots; doctors manage their schedules and approve 
-or reject appointment requests.
+## ✨ What We Have Done
 
-🌐 **Live:** [slotly.vercel.app](https://slotly.vercel.app) &nbsp;|&nbsp; 📦 **Repo:** [github.com/URAYUSHJAIN/Slotly](https://github.com/URAYUSHJAIN/Slotly)
+1. **Stunning User Interface**
+   - Designed a highly polished, glassmorphism-inspired UI with smooth micro-interactions.
+   - Built out all major pages: Landing Page, Auth Page, Browse Doctors, Patient Dashboard, and Doctor Dashboard.
 
-🚧 **Work in progress** — this project is being built for a coding 
-assessment. Full screenshots and feature list coming soon.
+2. **Full Authentication System**
+   - Integrated **Neon Auth** (powered by Better Auth) for seamless email/password authentication.
+   - Implemented role-based access control for **Patients** and **Doctors**, cleanly separating their workflows.
 
-## Tech Stack
+3. **Doctor Dashboard & Availability Management**
+   - Doctors can set their working hours, define 15/30-minute consultation slots, and manage their schedules.
+   - A dedicated dashboard to view upcoming and previous appointments.
 
-- **Frontend:** React (Vite) + Tailwind CSS v4 + React Router
-- **Auth:** Neon Auth (`@neondatabase/neon-js`)
-- **API:** Neon Data API (REST endpoints auto-generated from the database)
-- **Database:** Neon (PostgreSQL 17) with Row Level Security
-- **Deployment:** Vercel
+4. **Patient Booking Flow**
+   - Patients can browse specialists, search by symptom/specialty, and book real-time appointments.
+   - A dedicated patient dashboard to track appointment history.
 
-## Local Setup
+## 🚀 Future Roadmap
 
-```bash
-git clone https://github.com/URAYUSHJAIN/Slotly.git
-cd Slotly/client
-npm install
-cp .env.example .env.local
-# Fill in VITE_NEON_AUTH_URL and VITE_NEON_DATA_API_URL from your Neon console
-npm run dev
-```
-
-App runs at http://localhost:5173
+- **WhatsApp Notifications via Twilio**: Integrate Twilio's WhatsApp API to send real-time appointment reminders, booking confirmations, and cancellation alerts directly to patients' and doctors' phones.
+- **Payment Gateway Integration**: Add Stripe to handle consultation fees at the time of booking.
+- **Video Consultations**: Implement WebRTC or Zoom API for seamless remote telehealth appointments directly within Slotly.
+- **Advanced Search & Filtering**: Enhance the doctor directory with location-based search and advanced availability filters.
