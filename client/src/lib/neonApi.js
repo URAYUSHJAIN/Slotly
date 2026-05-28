@@ -41,10 +41,10 @@ export async function createProfile({
   gender,
   dateOfBirth,
 }) {
-  let retries = 5;
+  const MAX_ATTEMPTS = 8;
   let lastError = null;
 
-  while (retries > 0) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const { data, error } = await db
       .from('profiles')
       .insert({
@@ -53,23 +53,47 @@ export async function createProfile({
         first_name: firstName,
         last_name: lastName || null,
         mobile,
-        // gender: gender || null,
-        // date_of_birth: dateOfBirth || null,
+        gender: gender || null,
+        date_of_birth: dateOfBirth || null,
       })
       .select()
       .single();
 
-    if (!error) return data;
-
-    // If it's a foreign key violation (23503), the user hasn't synced yet.
-    lastError = error;
-    retries -= 1;
-    if (retries > 0) {
-      await new Promise(r => setTimeout(r, 1000)); // wait 1 second
+    if (!error) {
+      if (attempt > 1) {
+        console.log(`[Slotly] createProfile: succeeded on attempt ${attempt}`);
+      }
+      return data;
     }
+
+    lastError = error;
+    const code = error.code || '';
+    const msg  = (error.message || '').toLowerCase();
+    const isFkLag = code === '23503' || msg.includes('foreign key') || msg.includes('not present');
+    const isDuplicate = code === '23505' || msg.includes('duplicate') || msg.includes('already exists');
+
+    if (isDuplicate) {
+      // Profile already exists — treat as success (idempotent signup)
+      console.warn('[Slotly] createProfile: profile already exists, treating as success');
+      return null;
+    }
+
+    if (!isFkLag) {
+      // Non-retryable error — bail immediately
+      console.error('[Slotly] createProfile: non-retryable error', error);
+      throw new Error(error.message || 'Failed to create profile.');
+    }
+
+    // FK lag — wait with exponential-ish backoff (max 2s)
+    const delayMs = Math.min(500 * attempt, 2000);
+    console.log(`[Slotly] createProfile: attempt ${attempt} hit FK lag, retrying in ${delayMs}ms`);
+    await new Promise((r) => setTimeout(r, delayMs));
   }
 
-  throw new Error(`Failed to create profile after retries: ${lastError.message}`);
+  throw new Error(
+    `Profile creation failed after ${MAX_ATTEMPTS} attempts: ${lastError?.message || 'unknown error'}. ` +
+    `The Neon Auth user mirror may not have synced yet.`
+  );
 }
 
 export async function createDoctorDetails({
@@ -98,12 +122,18 @@ export async function createDoctorDetails({
 
 /** Fetch the signed-in user's profile (one row, by RLS). */
 export async function fetchMyProfile() {
+  const session = await authClient.getSession();
+  const userId = session?.data?.user?.id;
+  if (!userId) return null;
+
   const { data, error } = await db
     .from('profiles')
     .select('*')
-    .maybeSingle();
+    .eq('id', userId)
+    .limit(1);
+
   if (error) throw new Error(error.message);
-  return data;
+  return data?.[0] ?? null;
 }
 
 /* ── Doctor browsing ────────────────────────────────────────────── */
@@ -153,11 +183,31 @@ export async function createAppointment({
       start_time: startTime,
       end_time: endTime,
       fee: Number(fee),
-      status: 'upcoming'
+      status: 'pending',
     })
     .select()
     .single();
-    
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/**
+ * Update the status of an appointment. Used by doctors (approve / reject /
+ * complete) and patients (cancel). RLS enforces who is allowed.
+ */
+export async function updateAppointmentStatus(appointmentId, newStatus) {
+  const allowed = ['pending', 'upcoming', 'completed', 'cancelled', 'rejected'];
+  if (!allowed.includes(newStatus)) {
+    throw new Error(`Invalid status: ${newStatus}`);
+  }
+  const { data, error } = await db
+    .from('appointments')
+    .update({ status: newStatus })
+    .eq('id', appointmentId)
+    .select()
+    .single();
+
   if (error) throw new Error(error.message);
   return data;
 }
@@ -256,15 +306,69 @@ export async function fetchDoctorAvailabilityForDate(doctorId, dateString) {
  * Fetch a doctor's existing appointments for a specific date to prevent double-booking.
  */
 export async function fetchDoctorAppointmentsForDate(doctorId, dateString) {
+  // Pending + upcoming + completed block the slot.
+  // Cancelled and rejected free it up again for someone else to book.
   const { data, error } = await db
     .from('appointments')
     .select('start_time, end_time, status')
     .eq('doctor_id', doctorId)
     .eq('appointment_date', dateString)
-    .neq('status', 'cancelled');
-    
+    .in('status', ['pending', 'upcoming', 'completed']);
+
   if (error) throw new Error(error.message);
   return data;
+}
+
+/**
+ * Fetch every distinct patient who has any appointment with this doctor.
+ * Returns one row per patient with their profile details and a summary of
+ * how many appointments they have.
+ */
+export async function fetchDoctorPatients(doctorId) {
+  const { data, error } = await db
+    .from('appointments')
+    .select(`
+      patient_id,
+      appointment_date,
+      status,
+      profiles!patient_id (
+        id,
+        first_name,
+        last_name,
+        mobile,
+        gender,
+        date_of_birth
+      )
+    `)
+    .eq('doctor_id', doctorId)
+    .order('appointment_date', { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  const byPatient = new Map();
+  for (const row of data || []) {
+    const p = row.profiles;
+    if (!p?.id) continue;
+    const existing = byPatient.get(p.id);
+    if (existing) {
+      existing.totalAppointments += 1;
+      if (row.appointment_date > existing.lastVisit) {
+        existing.lastVisit = row.appointment_date;
+      }
+    } else {
+      byPatient.set(p.id, {
+        id: p.id,
+        firstName: p.first_name,
+        lastName:  p.last_name,
+        mobile:    p.mobile,
+        gender:    p.gender,
+        dateOfBirth: p.date_of_birth,
+        lastVisit: row.appointment_date,
+        totalAppointments: 1,
+      });
+    }
+  }
+  return Array.from(byPatient.values()).sort((a, b) => b.lastVisit.localeCompare(a.lastVisit));
 }
 
 /**
@@ -309,5 +413,3 @@ export async function fetchDoctorBookedAppointments(doctorId) {
   }));
 }
 
-/* ── Re-exports ─────────────────────────────────────────────────── */
-export { authClient };

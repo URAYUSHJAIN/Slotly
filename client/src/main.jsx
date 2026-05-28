@@ -1,4 +1,7 @@
+import { runHealthCheck } from './lib/healthCheck.js'
 import { StrictMode, useEffect } from 'react'
+
+runHealthCheck();
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import './index.css'

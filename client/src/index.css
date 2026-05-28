@@ -2486,6 +2486,16 @@ svg {
   color: #c93a3a;
 }
 
+.appointment-card__status.is-pending {
+  background: #fffbee;
+  color: #cc8b00;
+}
+
+.appointment-card__status.is-rejected {
+  background: #fff1f1;
+  color: #c93a3a;
+}
+
 .appointment-card__divider {
   height: 1px;
   background: #f4f5fb;

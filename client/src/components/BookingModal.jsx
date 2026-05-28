@@ -216,9 +216,9 @@ export default function BookingModal({ doctor, onClose, onBook }) {
             <div className="booking-modal__success-icon">
               <CheckCircle size={32} />
             </div>
-            <div className="booking-modal__success-title">Appointment Booked!</div>
+            <div className="booking-modal__success-title">Booking Requested!</div>
             <div className="booking-modal__success-sub">
-              Redirecting to your appointments…
+              Awaiting doctor confirmation. You'll see it in your appointments shortly.
             </div>
           </div>
         ) : (
@@ -300,7 +300,7 @@ export default function BookingModal({ doctor, onClose, onBook }) {
               disabled={!date || selectedSlot === null || status === 'confirming'}
               onClick={handleConfirm}
             >
-              {status === 'confirming' ? 'Booking…' : 'Confirm Appointment'}
+              {status === 'confirming' ? 'Requesting…' : 'Request Appointment'}
             </button>
           </>
         )}
