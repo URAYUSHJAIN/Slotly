@@ -71,6 +71,8 @@ export async function createProfile({
     const msg  = (error.message || '').toLowerCase();
     const isFkLag = code === '23503' || msg.includes('foreign key') || msg.includes('not present');
     const isDuplicate = code === '23505' || msg.includes('duplicate') || msg.includes('already exists');
+    // JWT might not be ready immediately after signup — treat as retryable
+    const isAuthLag = msg.includes('missing authentication') || msg.includes('bearer token') || msg.includes('jwt');
 
     if (isDuplicate) {
       // Profile already exists — treat as success (idempotent signup)
@@ -78,15 +80,16 @@ export async function createProfile({
       return null;
     }
 
-    if (!isFkLag) {
+    if (!isFkLag && !isAuthLag) {
       // Non-retryable error — bail immediately
       console.error('[Slotly] createProfile: non-retryable error', error);
       throw new Error(error.message || 'Failed to create profile.');
     }
 
-    // FK lag — wait with exponential-ish backoff (max 2s)
+    // FK lag or JWT not yet ready — wait with exponential-ish backoff (max 2s)
     const delayMs = Math.min(500 * attempt, 2000);
-    console.log(`[Slotly] createProfile: attempt ${attempt} hit FK lag, retrying in ${delayMs}ms`);
+    const reason = isAuthLag ? 'JWT not ready' : 'FK lag';
+    console.log(`[Slotly] createProfile: attempt ${attempt} hit ${reason}, retrying in ${delayMs}ms`);
     await new Promise((r) => setTimeout(r, delayMs));
   }
 

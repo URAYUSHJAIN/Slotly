@@ -15,7 +15,7 @@
  *     the request manually to capture the real body, then translate it
  *     into a clear user-facing message.
  */
-import { authClient } from './auth.js';
+import { authClient, waitForJwt } from './auth.js';
 import {
   createProfile,
   createDoctorDetails,
@@ -130,6 +130,9 @@ export async function signUp(payload) {
     throw new Error('Signup succeeded but no user ID was returned. Please try logging in.');
   }
 
+  // Wait for the session JWT to be available before hitting the Data API
+  await waitForJwt(5000);
+
   // Step 2 — profile row (this retries internally for FK lag)
   try {
     await createProfile({
@@ -189,18 +192,25 @@ export async function signIn({ email, password, expectedRole }) {
     throw new Error(translateLoginError(error, raw));
   }
 
+  // Wait for the session JWT to be available before hitting the Data API
+  const jwt = await waitForJwt(5000);
+  if (!jwt) {
+    await authClient.signOut().catch(() => {});
+    throw new Error('Login succeeded but session could not be established. Please try again.');
+  }
+
   // Profile fetch — may take a beat for the session to be readable
   let profile = null;
-  for (let attempt = 0; attempt < 3 && !profile; attempt += 1) {
+  for (let attempt = 0; attempt < 5 && !profile; attempt += 1) {
     try {
       profile = await fetchMyProfile();
     } catch (err) {
-      if (attempt === 2) {
+      if (attempt === 4) {
         await authClient.signOut().catch(() => {});
         throw new Error(`Could not load your profile: ${err.message}`);
       }
     }
-    if (!profile) await new Promise((r) => setTimeout(r, 500));
+    if (!profile) await new Promise((r) => setTimeout(r, 600));
   }
 
   if (!profile) {

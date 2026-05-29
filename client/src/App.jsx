@@ -61,9 +61,11 @@ function SectionHeader({ badge, badgeVariant = 'primary', title, subtitle }) {
 
 /* ── Page ───────────────────────────────────────────── */
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from './lib/useAuth.jsx';
 
 export default function App() {
   const navigate = useNavigate();
+  const { status } = useAuth();
 
   return (
     <div style={{ minHeight: '100vh' }}>
@@ -102,7 +104,11 @@ export default function App() {
         </div>
 
         <div className="u-container" style={{ marginTop: 20 }}>
-          <Button variant="secondary" size="sm">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate(status === 'authed' ? '/doctors' : '/auth')}
+          >
             View all specialties <ArrowRight size={13} />
           </Button>
         </div>

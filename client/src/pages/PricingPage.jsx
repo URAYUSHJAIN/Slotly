@@ -3,11 +3,13 @@
  * Layout: 3 plan cards in a row, plan-comparison bar chart below.
  */
 import { CheckCircle, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { Navbar } from '../components/Navbar.jsx';
 import { Badge } from '../components/Badge.jsx';
 import { Button } from '../components/Button.jsx';
 import { BarChart } from '../components/Viz.jsx';
+import { useAuth } from '../lib/useAuth.jsx';
 
 const PLANS = [
   {
@@ -46,6 +48,10 @@ const COMPARE = [
 ];
 
 export default function PricingPage() {
+  const navigate = useNavigate();
+  const { status } = useAuth();
+  const goBooking = () => navigate(status === 'authed' ? '/appointments' : '/auth');
+
   return (
     <div style={{ minHeight: '100vh' }}>
       <div className="page-content">
@@ -107,8 +113,8 @@ export default function PricingPage() {
               Switch tiers anytime. Patient bookings are always free.
             </span>
             <div className="page-fit__foot-actions">
-              <Button variant="secondary" size="sm">Contact sales</Button>
-              <Button variant="primary" size="sm">Start free <ArrowRight size={12} /></Button>
+              <Button variant="secondary" size="sm" onClick={goBooking}>Contact sales</Button>
+              <Button variant="primary" size="sm" onClick={goBooking}>Start free <ArrowRight size={12} /></Button>
             </div>
           </div>
         </main>

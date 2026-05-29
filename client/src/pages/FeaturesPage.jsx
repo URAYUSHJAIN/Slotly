@@ -6,10 +6,12 @@ import {
   Calendar, MessageSquare, Shield, Zap, LineChart, Users, ArrowRight,
 } from 'lucide-react';
 
+import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar.jsx';
 import { Badge } from '../components/Badge.jsx';
 import { Button } from '../components/Button.jsx';
 import { BarChart } from '../components/Viz.jsx';
+import { useAuth } from '../lib/useAuth.jsx';
 
 const FEATURES = [
   { title: 'Real-time availability', desc: 'Live calendar sync — no double bookings.', icon: <Calendar size={14} />,      accent: '#eef2ff', color: '#4f6df5' },
@@ -28,6 +30,10 @@ const IMPACT = [
 ];
 
 export default function FeaturesPage() {
+  const navigate = useNavigate();
+  const { status } = useAuth();
+  const goBooking = () => navigate(status === 'authed' ? '/appointments' : '/auth');
+
   return (
     <div style={{ minHeight: '100vh' }}>
       <div className="page-content">
@@ -72,8 +78,8 @@ export default function FeaturesPage() {
               Built for clinics that value trust — and patients who value their time.
             </span>
             <div className="page-fit__foot-actions">
-              <Button variant="secondary" size="sm">Talk to a clinic</Button>
-              <Button variant="primary" size="sm">Start booking <ArrowRight size={12} /></Button>
+              <Button variant="secondary" size="sm" onClick={goBooking}>Talk to a clinic</Button>
+              <Button variant="primary" size="sm" onClick={goBooking}>Start booking <ArrowRight size={12} /></Button>
             </div>
           </div>
         </main>

@@ -38,3 +38,18 @@ export async function getJwt() {
     return null;
   }
 }
+
+/**
+ * Polls until a JWT is available or the timeout expires.
+ * Call this right after signIn/signUp to ensure the session is fully
+ * established before making Neon Data API calls.
+ */
+export async function waitForJwt(maxWaitMs = 4000) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    const token = await getJwt();
+    if (token) return token;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return null;
+}

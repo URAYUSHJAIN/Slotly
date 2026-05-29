@@ -42,11 +42,12 @@ export async function runHealthCheck() {
 
   const jwt = await getJwt().catch(() => null);
   const headers = jwt ? { Authorization: `Bearer ${jwt}` } : {};
-  // Use limit=1 so PostgREST doesn't reject the request on stricter configs.
+  if (!jwt) console.log('[Slotly] Neon Data API      : (no session — pinging unauthenticated)');
+  // 400 = Neon Data API reachable but requires a JWT bearer token (expected when unauthenticated)
   await pingUrl(
     'Neon Data API      ',
     DATA_API_URL ? `${DATA_API_URL}/profiles?select=id&limit=1` : null,
-    [200, 401, 403],
+    jwt ? [200, 401, 403] : [200, 400, 401, 403],
     headers
   );
   console.groupEnd();
