@@ -114,8 +114,8 @@ erDiagram
         timestamptz created_at
     }
     PROFILES {
-        uuid id PK_FK "→ neon_auth.users_sync.id"
-        text role "patient | doctor"
+        uuid id PK
+        text role
         text first_name
         text last_name
         text mobile
@@ -124,7 +124,7 @@ erDiagram
         timestamptz created_at
     }
     DOCTORS {
-        uuid id PK_FK "→ profiles.id"
+        uuid id PK
         text qualification
         text experience
         text speciality
@@ -134,18 +134,18 @@ erDiagram
     }
     APPOINTMENTS {
         uuid id PK
-        uuid patient_id FK "→ profiles.id"
-        uuid doctor_id FK "→ doctors.id"
+        uuid patient_id FK
+        uuid doctor_id FK
         date appointment_date
         text start_time
         text end_time
         numeric fee
-        text status "pending|upcoming|completed|cancelled|rejected"
+        text status
         timestamptz created_at
     }
     DOCTOR_AVAILABILITY {
         uuid id PK
-        uuid doctor_id FK "→ doctors.id"
+        uuid doctor_id FK
         date available_date
         text start_time
         text end_time
@@ -153,7 +153,7 @@ erDiagram
         timestamptz created_at
     }
 
-    NEON_AUTH_USERS_SYNC ||--|| PROFILES : "1-to-1 (on delete cascade)"
+    NEON_AUTH_USERS_SYNC ||--|| PROFILES : "1-to-1 (cascade delete)"
     PROFILES ||--o| DOCTORS : "extends (if doctor)"
     PROFILES ||--o{ APPOINTMENTS : "books (as patient)"
     DOCTORS ||--o{ APPOINTMENTS : "receives (as doctor)"
