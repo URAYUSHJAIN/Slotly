@@ -24,8 +24,28 @@
 ### For Doctors
 1. Go to the [Live Demo](https://slotlly.vercel.app/).
 2. Click on the **Doctor Login** tab, then click **Signup** at the bottom to create a doctor profile (requires details like Speciality, Experience, and Price).
-3. Once logged in, use the **Schedule** tab to set your working hours and consultation duration.
+3. Once logged in, use the **Schedule** tab to set your working hours and availability blocks.
 4. View your daily schedule and manage incoming patient appointments on the Doctor Dashboard.
+
+---
+
+## 🔑 Test Credentials
+
+> You can **login / signup** directly using the pre-seeded accounts below — no registration required!
+
+### 🧑‍⚕️ Patient Account
+| Field        | Value                       |
+|--------------|-----------------------------|
+| **Name**     | Aarav Kapoor                |
+| **Email**    | aarav.kapoor@vercel.app     |
+| **Password** | patient@123                 |
+
+### 👨‍⚕️ Doctor Account
+| Field        | Value                       |
+|--------------|-----------------------------|
+| **Name**     | Anjali Sharma               |
+| **Email**    | anjali.sharma@vercel.app    |
+| **Password** | doctor@123                  |
 
 ---
 
@@ -46,11 +66,12 @@ Many small clinics and healthcare centers still manage patient appointments manu
 - [x] I should be able to view daily schedules.
 
 ## 🏗️ Core Features
-- **Authentication**: Secure email/password login using Neon Auth.
-- **Doctor Listing**: Dynamic search and filtering of specialists.
-- **Appointment Booking**: Real-time slot reservation system.
-- **Schedule Management**: Doctors can define their availability and consultation slot duration.
+- **Authentication**: Secure email/password login using Neon Auth (Better Auth). No passwords stored in our database.
+- **Doctor Listing**: Dynamic search and filtering of specialists across `BrowseDoctorsPage`.
+- **Appointment Booking**: Real-time slot reservation with fee, start time, and end time captured via `BookingModal`.
+- **Availability Management**: Doctors define date-specific availability blocks in `DoctorSchedule`.
 - **Dashboard**: Role-based isolated dashboards for both patients and doctors.
+- **Status Workflow**: Appointments flow through `pending → upcoming → completed` or `rejected / cancelled`.
 
 ---
 
@@ -66,10 +87,17 @@ flowchart LR
     DB -->|Row-Level Security| SecuredData["Secured User Data"]
 ```
 
-1. **Frontend (Client)**: Built with **React** and **Vite**. Deployed on **Vercel**. Handles routing, UI state, and role-based views.
-2. **Authentication (Identity)**: Managed by **Neon Auth (Better Auth)**. Handles secure sign-ups, JWT generation, and session management.
-3. **Backend / Database (Data Layer)**: Powered by **Neon Serverless Postgres** via the **Neon Data API**. Exposes a RESTful interface to directly query the database from the client using secure JWT validation.
-4. **Security Layer**: Row-Level Security (RLS) is enforced directly at the Postgres database level, ensuring users can only read/write their own appointments and profiles based on their JWT `sub` claim.
+| Layer | Technology | Responsibility |
+|---|---|---|
+| **Frontend** | React 18 + Vite, deployed on Vercel | Routing, UI state, role-based views |
+| **Identity** | Neon Auth (Better Auth) | Signup, login, JWT generation & session management |
+| **Data API** | Neon Data API (PostgREST) | RESTful DB interface, JWT validation, grant enforcement |
+| **Database** | Neon Serverless Postgres | Data storage, Row-Level Security, schema |
+
+### Key Design Decisions
+1. **No custom backend server** — The React client calls Neon's Data API directly using Bearer JWTs, eliminating a traditional Express/Node middleware layer.
+2. **Security at the DB level** — RLS policies on every table ensure users can only read/write their own rows, even if the frontend sends a malformed request.
+3. **Role-based access** — A `role` field on `profiles` (`'patient'` | `'doctor'`) drives all conditional UI rendering and DB policy enforcement.
 
 ---
 
@@ -79,74 +107,180 @@ flowchart LR
 
 ```mermaid
 erDiagram
-    PROFILES {
+    NEON_AUTH_USERS_SYNC {
         uuid id PK
-        string role "patient | doctor"
-        string first_name
-        string last_name
-        string mobile
+        text email
+        text name
+        timestamptz created_at
+    }
+    PROFILES {
+        uuid id PK_FK "→ neon_auth.users_sync.id"
+        text role "patient | doctor"
+        text first_name
+        text last_name
+        text mobile
+        text gender
+        date date_of_birth
+        timestamptz created_at
     }
     DOCTORS {
-        uuid id FK "References PROFILES"
-        string qualification
-        string speciality
-        string appointment_price
+        uuid id PK_FK "→ profiles.id"
+        text qualification
+        text experience
+        text speciality
+        numeric appointment_price
+        text documents_name
+        timestamptz created_at
     }
     APPOINTMENTS {
         uuid id PK
-        uuid patient_id FK
-        uuid doctor_id FK
+        uuid patient_id FK "→ profiles.id"
+        uuid doctor_id FK "→ doctors.id"
         date appointment_date
-        string time_slot
-        string status "pending | confirmed"
+        text start_time
+        text end_time
+        numeric fee
+        text status "pending|upcoming|completed|cancelled|rejected"
+        timestamptz created_at
+    }
+    DOCTOR_AVAILABILITY {
+        uuid id PK
+        uuid doctor_id FK "→ doctors.id"
+        date available_date
+        text start_time
+        text end_time
+        text label
+        timestamptz created_at
     }
 
+    NEON_AUTH_USERS_SYNC ||--|| PROFILES : "1-to-1 (on delete cascade)"
     PROFILES ||--o| DOCTORS : "extends (if doctor)"
     PROFILES ||--o{ APPOINTMENTS : "books (as patient)"
-    PROFILES ||--o{ APPOINTMENTS : "receives (as doctor)"
+    DOCTORS ||--o{ APPOINTMENTS : "receives (as doctor)"
+    DOCTORS ||--o{ DOCTOR_AVAILABILITY : "defines availability"
 ```
 
-- **`profiles`**: Stores base user data. (1-to-1 mapping with Auth).
-  - `id` (UUID, Primary Key)
-  - `role` ('patient' or 'doctor')
+#### Table Details
+
+- **`neon_auth.users_sync`** *(read-only mirror, managed by Neon Auth)*
+  - Provisioned automatically when Neon Auth is enabled. Contains `id`, `email`, `name`.
+
+- **`profiles`** — Base user data, one row per auth user.
+  - `id` (UUID, PK — FK to `neon_auth.users_sync.id`, cascade delete)
+  - `role` — `'patient'` or `'doctor'`
   - `first_name`, `last_name`, `mobile`, `gender`, `date_of_birth`
 
-- **`doctors`**: Extension table for doctor-specific metadata.
-  - `id` (UUID, Foreign Key to `profiles.id`)
-  - `qualification`, `experience`, `speciality`, `appointment_price`
+- **`doctors`** — Doctor-specific extension, only for `role = 'doctor'` profiles.
+  - `id` (UUID, PK + FK to `profiles.id`, cascade delete)
+  - `qualification`, `experience`, `speciality`, `appointment_price`, `documents_name`
 
-- **`appointments`**: Tracks bookings between patients and doctors.
-  - `id` (UUID, Primary Key)
-  - `patient_id` (UUID, FK to `profiles`)
-  - `doctor_id` (UUID, FK to `profiles`)
-  - `appointment_date` (Date)
-  - `time_slot` (String)
-  - `status` ('pending', 'confirmed', 'cancelled', 'completed')
+- **`appointments`** — Booking records linking patients to doctors.
+  - `id` (UUID, PK — auto-generated)
+  - `patient_id` / `doctor_id` (FK to `profiles` / `doctors`)
+  - `appointment_date` (Date), `start_time`, `end_time` (text HH:MM), `fee` (numeric)
+  - `status` — `pending` → `upcoming` → `completed` | `cancelled` | `rejected`
 
-### Frontend Component Structure
+- **`doctor_availability`** — Date-specific availability blocks set by doctors.
+  - `id` (UUID, PK — auto-generated)
+  - `doctor_id` (FK to `doctors.id`, cascade delete)
+  - `available_date` (Date), `start_time`, `end_time`, `label`
 
-- `App.jsx` - Core routing and layout wrapper.
-- `/pages`
-  - `LandingPage.jsx` - Hero sections, marketing copy.
-  - `AuthPage.jsx` - Handles dual-role (Patient/Doctor) login and signup.
-  - `DoctorsPage.jsx` - Search, filter, and list available doctors.
-  - `AppointmentsPage.jsx` - Role-based dashboard router.
-    - `PatientAppointments.jsx` - View history and upcoming bookings.
-    - `DoctorDashboard.jsx` - View and manage daily schedules.
-    - `DoctorSchedule.jsx` - Manage availability slots.
-- `/lib`
-  - `neonApi.js` - Wrapper for all direct Data API REST calls.
+#### Row-Level Security Summary
+
+| Table | Policy | Rule |
+|---|---|---|
+| `profiles` | read own | `id = current_user_id()` |
+| `profiles` | read doctors (public) | `role = 'doctor'` |
+| `profiles` | insert / update own | `id = current_user_id()` |
+| `doctors` | read all | `true` (any authenticated user) |
+| `doctors` | insert / update own | `id = current_user_id()` |
+| `appointments` | read (patient) | `patient_id = current_user_id()` |
+| `appointments` | read (doctor) | `doctor_id = current_user_id()` |
+| `appointments` | insert | `patient_id = current_user_id()` |
+| `appointments` | update (doctor) | `doctor_id = current_user_id()` |
+| `appointments` | update (patient) | `patient_id = current_user_id()` |
+| `doctor_availability` | read all | `true` |
+| `doctor_availability` | insert / delete own | `doctor_id = current_user_id()` |
+
+---
+
+### Frontend Structure
+
+```
+client/src/
+├── main.jsx                    # App entry point, auth provider setup
+├── App.jsx                     # Core routing & layout wrapper
+├── index.css                   # Global design system & glassmorphism styles
+│
+├── pages/
+│   ├── AuthPage.jsx            # Dual-role (Patient/Doctor) login & signup
+│   ├── BrowseDoctorsPage.jsx   # Search, filter, and list available doctors
+│   ├── AppointmentsPage.jsx    # Role-based dashboard router
+│   ├── PatientsPage.jsx        # Patient-facing marketing / info page
+│   ├── AboutPage.jsx           # About Slotly page
+│   ├── FeaturesPage.jsx        # Feature highlights page
+│   ├── HowItWorksPage.jsx      # Step-by-step explainer
+│   ├── PricingPage.jsx         # Pricing tiers page
+│   ├── SupportPage.jsx         # Support & contact page
+│   ├── PrivacyPage.jsx         # Privacy policy
+│   ├── TermsPage.jsx           # Terms of service
+│   └── appointments/
+│       ├── PatientAppointments.jsx  # Patient: view history & upcoming bookings
+│       ├── DoctorDashboard.jsx      # Doctor: view & manage daily schedules
+│       └── DoctorSchedule.jsx       # Doctor: set availability blocks
+│
+├── components/
+│   ├── Navbar.jsx              # Responsive navigation bar
+│   ├── Hero.jsx                # Landing hero section
+│   ├── BookingModal.jsx        # Appointment booking dialog (slot picker + fee)
+│   ├── SearchBar.jsx           # Doctor search & specialty filter
+│   ├── Viz.jsx                 # Data visualisation component
+│   ├── Badge.jsx               # Status / role badge
+│   ├── Button.jsx              # Reusable styled button
+│   ├── Card.jsx                # Generic card container
+│   ├── ServiceCard.jsx         # Service feature card
+│   └── StatCard.jsx            # Statistics display card
+│
+└── lib/
+    ├── neonApi.js              # All Neon Data API REST calls (appointments, doctors, availability)
+    ├── authActions.js          # Sign-up, sign-in, sign-out via Neon Auth
+    ├── auth.js                 # Auth client configuration
+    ├── useAuth.jsx             # React hook — current user + JWT access
+    └── healthCheck.js          # API connectivity health check
+```
+
+### API Flow — Booking an Appointment
+
+```mermaid
+sequenceDiagram
+    actor Patient
+    participant BookingModal
+    participant neonApi
+    participant DataAPI as Neon Data API
+    participant DB as Postgres (RLS)
+
+    Patient->>BookingModal: Selects doctor, date & slot
+    BookingModal->>neonApi: createAppointment(payload)
+    neonApi->>DataAPI: POST /appointments (Bearer JWT)
+    DataAPI->>DB: INSERT — RLS checks patient_id = sub
+    DB-->>DataAPI: 201 Created
+    DataAPI-->>neonApi: { id, status: "pending", ... }
+    neonApi-->>BookingModal: success
+    BookingModal-->>Patient: Confirmation UI
+```
 
 ---
 
 ## ✨ Design & Tech Highlights
-- **Stunning User Interface**: Designed a highly polished, glassmorphism-inspired UI with smooth micro-interactions.
-- **No-Backend Architecture**: Utilized Neon Data API (PostgREST) to query the database directly from the React frontend, reducing latency and infrastructure complexity.
+- **Stunning User Interface**: Highly polished glassmorphism-inspired UI with smooth micro-interactions.
+- **No-Backend Architecture**: Neon Data API (PostgREST) queried directly from the React frontend — no Express/Node server needed.
+- **Security-first**: Row-Level Security enforced at the Postgres level for every table.
+- **Role-based UX**: Single auth flow that branches into distinct Patient and Doctor experiences.
 
 ## 🚀 Future Roadmap
-- **WhatsApp Notifications via Twilio**: Integrate Twilio's WhatsApp API to send real-time appointment reminders, booking confirmations, and cancellation alerts directly to patients' and doctors' phones.
-- **Payment Gateway Integration**: Add Stripe to handle consultation fees at the time of booking.
-- **Video Consultations**: Implement WebRTC or Zoom API for seamless remote telehealth appointments directly within Slotly.
+- **WhatsApp Notifications via Twilio**: Real-time appointment reminders, confirmations, and cancellation alerts.
+- **Payment Gateway Integration**: Stripe for consultation fees at the time of booking.
+- **Video Consultations**: WebRTC or Zoom API for seamless remote telehealth appointments.
 
 ---
 
